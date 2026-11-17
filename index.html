@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VPN SOPR Pro | 3x-ui Management Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
+    }
+  </script>
+  <style>
+    .x-card { border-radius: 10px; transition: all 0.2s ease; }
+    .dark .x-card { background: #1f1f1f; border: 1px solid #303030; }
+    html:not(.dark) .x-card { background: #ffffff; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .proto-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 dark:bg-[#141414] dark:text-gray-200 min-h-screen transition-colors">
+
+  <!-- LOGIN -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 relative">
+    <button onclick="document.documentElement.classList.toggle('dark')" class="absolute top-5 right-5 p-2.5 rounded-lg x-card">☀️</button>
+    <div class="w-full max-w-md x-card p-8 shadow-2xl">
+      <div class="flex flex-col items-center mb-6">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white text-2xl font-bold shadow-lg mb-3">VS</div>
+        <h1 class="text-2xl font-bold">VPN SOPR Pro</h1>
+        <p class="text-xs text-gray-400 mt-1">v5.3 • WireGuard • AmneziaWG • OpenVPN • Private DNS</p>
+      </div>
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs mb-1.5 text-gray-400">Username</label>
+          <input id="login-user" type="text" required class="w-full px-3.5 py-2.5 rounded-lg bg-gray-50 dark:bg-[#141414] border border-gray-300 dark:border-[#303030] outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs mb-1.5 text-gray-400">Password</label>
+          <input id="login-pass" type="password" required class="w-full px-3.5 py-2.5 rounded-lg bg-gray-50 dark:bg-[#141414] border border-gray-300 dark:border-[#303030] outline-none" />
+        </div>
+        <p id="login-err" class="text-xs text-red-500 hidden">Invalid username or password.</p>
+        <button type="submit" class="w-full py-2.5 rounded-lg bg-[#1677ff] hover:bg-blue-500 text-white font-semibold shadow-md">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div id="main-app" class="hidden min-h-screen flex flex-col lg:flex-row">
+    <aside class="w-full lg:w-64 x-card lg:rounded-none lg:border-y-0 lg:border-l-0 flex flex-col justify-between shrink-0">
+      <div>
+        <div class="p-5 border-b border-gray-200 dark:border-[#303030] flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">VS</div>
+            <div>
+              <div class="font-bold text-base">VPN SOPR</div>
+              <div class="text-[11px] text-emerald-500 font-mono">Pro v5.3 • 3x-ui</div>
+            </div>
+          </div>
+          <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-[#262626]">🌓</button>
+        </div>
+        <nav class="p-3 space-y-1.5">
+          <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium bg-blue-600/15 text-blue-500">📊 System Status & Logs</button>
+          <button onclick="switchTab('inbounds')" id="nav-inbounds" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-[#262626]">🔌 Inbounds & Clients</button>
+          <button onclick="switchTab('dns-control')" id="nav-dns-control" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-[#262626]">🛡️ DNS IP Auth & Blocking</button>
+          <button onclick="switchTab('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-[#262626]">⚙️ Telegram, Domain & Backup</button>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200 dark:border-[#303030] space-y-2">
+        <div class="text-xs text-gray-500 flex justify-between">
+          <span>Host / Domain:</span>
+          <span id="sidebar-domain" class="font-mono text-gray-300 truncate max-w-[130px]">-</span>
+        </div>
+        <button onclick="location.reload()" class="w-full py-2 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-medium">Logout</button>
+      </div>
+    </aside>
+
+    <main class="flex-1 p-4 lg:p-6 overflow-y-auto space-y-6">
+      <!-- TAB 1: DASHBOARD -->
+      <section id="tab-dashboard" class="space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="x-card p-4">
+            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400">CPU Usage</span><span id="cpu-val" class="font-bold text-blue-400 font-mono">0%</span></div>
+            <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden"><div id="cpu-bar" class="h-full bg-blue-500" style="width:0%"></div></div>
+            <div id="cpu-sub" class="text-[11px] text-gray-500 mt-2">Ubuntu 22.04+</div>
+          </div>
+          <div class="x-card p-4">
+            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400">Memory (RAM)</span><span id="ram-val" class="font-bold text-emerald-400 font-mono">0 GB</span></div>
+            <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden"><div id="ram-bar" class="h-full bg-emerald-500" style="width:0%"></div></div>
+            <div class="text-[11px] text-gray-500 mt-2">Real-time Telemetry</div>
+          </div>
+          <div class="x-card p-4">
+            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400">Storage (Disk)</span><span id="disk-val" class="font-bold text-amber-400 font-mono">0 GB</span></div>
+            <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden"><div id="disk-bar" class="h-full bg-amber-500" style="width:0%"></div></div>
+            <div id="dns-port-sub" class="text-[11px] text-gray-500 mt-2">DNS Port: 5353</div>
+          </div>
+          <div class="x-card p-4">
+            <div class="flex justify-between text-xs mb-2"><span class="text-gray-400">Total Clients / DNS</span><span id="active-clients-count" class="font-bold text-purple-400 font-mono">0</span></div>
+            <div id="net-io-sub" class="text-[11px] text-gray-400 mt-2 font-mono">↑ 0 GB | ↓ 0 GB</div>
+            <div id="dns-queries-sub" class="text-[11px] text-emerald-400 mt-1 font-mono">DNS Queries: 0 (Blocked: 0)</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 x-card p-5">
+            <h2 class="font-bold text-sm mb-3">Live Server Resource Monitor</h2>
+            <div class="h-60"><canvas id="trafficChart"></canvas></div>
+          </div>
+          <div class="x-card p-5 space-y-3">
+            <h2 class="font-bold text-sm">System Audit Logs</h2>
+            <div id="audit-logs-box" class="space-y-2 max-h-60 overflow-y-auto text-xs"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: INBOUNDS & CLIENTS -->
+      <section id="tab-inbounds" class="hidden space-y-4">
+        <div class="x-card p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="font-bold text-base">Unified Inbounds, Quota/Time Limits & Subscriptions</h2>
+            <p class="text-xs text-gray-400">Manage WireGuard, AmneziaWG, OpenVPN & Private DNS accounts with automated expiry enforcement</p>
+          </div>
+          <div class="flex gap-2">
+            <select id="filter-proto" onchange="renderInbounds()" class="px-3 py-2 rounded-lg text-xs bg-gray-100 dark:bg-[#141414] border border-gray-300 dark:border-[#303030]">
+              <option value="ALL">All Protocols</option>
+              <option value="WireGuard">WireGuard</option>
+              <option value="AmneziaWG">AmneziaWG</option>
+              <option value="OpenVPN">OpenVPN</option>
+              <option value="Private DNS">Private DNS</option>
+            </select>
+            <button onclick="openModal('modal-inbound')" class="px-4 py-2 rounded-lg bg-[#1677ff] text-white text-xs font-semibold">+ Add Inbound</button>
+          </div>
+        </div>
+        <div class="x-card overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-gray-50 dark:bg-[#262626] text-gray-400 border-b border-gray-200 dark:border-[#303030]">
+              <tr>
+                <th class="p-3.5 w-10"></th>
+                <th class="p-3.5">Status</th>
+                <th class="p-3.5">Remark</th>
+                <th class="p-3.5">Protocol</th>
+                <th class="p-3.5">Endpoint:Port</th>
+                <th class="p-3.5">Clients</th>
+                <th class="p-3.5 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inbounds-tbody" class="divide-y divide-gray-200 dark:divide-[#303030]"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3: DNS IP AUTH, BLOCKING & CUSTOM RECORDS -->
+      <section id="tab-dns-control" class="hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="x-card p-5 space-y-4">
+            <h3 class="font-bold text-sm">Authorized Client IPs for Private DNS</h3>
+            <div id="dns-ip-list" class="space-y-2.5 max-h-80 overflow-y-auto"></div>
+          </div>
+          <div class="x-card p-5 space-y-4">
+            <h3 class="font-bold text-sm">Domain & Category Sinkhole Blocker</h3>
+            <div id="block-categories" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+            <form onsubmit="addBlockedDomain(event)" class="flex gap-2">
+              <input id="new-block-domain" type="text" placeholder="*.example.com" required class="flex-1 px-3 py-2 rounded-lg text-xs bg-gray-100 dark:bg-[#141414] border border-gray-300 dark:border-[#303030]" />
+              <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold">Block Domain</button>
+            </form>
+            <div id="blocked-domains-tags" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
+        <div class="x-card p-5 space-y-4 text-xs">
+          <div>
+            <h3 class="font-bold text-sm text-emerald-400">Custom DNS A-Records (Split-Horizon / Local Overrides)</h3>
+            <p class="text-[11px] text-gray-400">Redirect specific domains to custom IP addresses for authorized DNS clients.</p>
+          </div>
+          <form onsubmit="addCustomRecord(event)" class="flex flex-wrap gap-2">
+            <input id="rec-domain" type="text" placeholder="e.g. game.local" required class="flex-1 min-w-[180px] px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+            <input id="rec-ip" type="text" placeholder="Target IPv4 (e.g. 185.204.168.10)" required class="flex-1 min-w-[180px] px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+            <button type="submit" class="px-4 py-2 rounded bg-emerald-600 text-white font-semibold">+ Add Record</button>
+          </form>
+          <div id="custom-records-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2"></div>
+        </div>
+      </section>
+
+      <!-- TAB 4: TELEGRAM BOT, DOMAIN/SSL & BACKUP/RESTORE -->
+      <section id="tab-settings" class="hidden space-y-6">
+        <form onsubmit="saveAllSettings(event)" class="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
+          <div class="x-card p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+              <h3 class="font-bold text-sm text-sky-400">🤖 Telegram Bot Integration</h3>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input id="set-tg-enabled" type="checkbox" class="accent-blue-600" />
+                <span>Enable Bot</span>
+              </label>
+            </div>
+            <div>
+              <label class="block mb-1 text-gray-400">BotFather Token</label>
+              <input id="set-tg-token" type="text" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+            </div>
+            <div>
+              <label class="block mb-1 text-gray-400">Admin Chat ID</label>
+              <input id="set-tg-admin" type="text" placeholder="e.g. 123456789" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+            </div>
+            <div class="flex gap-2">
+              <button type="button" onclick="testTelegram()" class="px-3.5 py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold">Send Test Message</button>
+              <button type="button" onclick="sendBackupTelegram()" class="px-3.5 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">Send Backup to Telegram</button>
+            </div>
+            <p class="text-[11px] text-gray-400">Bot Commands: <code>/stats</code> &bull; <code>/clients</code> &bull; <code>/backup</code> &bull; <code>/info</code> &bull; <code>/id</code></p>
+          </div>
+
+          <div class="x-card p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+              <h3 class="font-bold text-sm text-emerald-400">🌐 Domain, SSL, Web Path & Security</h3>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block mb-1 text-gray-400">Domain Name</label>
+                <input id="set-domain" type="text" placeholder="sub.vpnsopr.ir" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+              </div>
+              <div>
+                <label class="block mb-1 text-gray-400">Sub Base URL</label>
+                <input id="set-sub-base" type="text" placeholder="https://sub.vpnsopr.ir" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+              </div>
+              <div>
+                <label class="block mb-1 text-gray-400">Secret Web Path</label>
+                <input id="set-web-path" type="text" placeholder="/a8f2k9x1" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block mb-1 text-gray-400">Admin Username</label>
+                <input id="set-admin-user" type="text" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+              </div>
+              <div>
+                <label class="block mb-1 text-gray-400">Admin Password</label>
+                <input id="set-admin-pass" type="text" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+              </div>
+              <div>
+                <label class="block mb-1 text-gray-400">Upstream DNS</label>
+                <input id="set-dns-upstream" type="text" value="1.1.1.1" placeholder="1.1.1.1" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button type="submit" class="px-4 py-2 rounded bg-[#1677ff] hover:bg-blue-500 text-white font-semibold">Save All Settings</button>
+              <button type="button" onclick="applyDomainSsl()" class="px-4 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold">🔒 Issue Free SSL (Certbot)</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="x-card p-5 space-y-4 text-xs">
+          <div class="flex flex-wrap justify-between items-center gap-2 border-b border-gray-700 pb-2">
+            <div>
+              <h3 class="font-bold text-sm text-amber-400">💾 Database Backup & Restore</h3>
+              <p class="text-[11px] text-gray-400">Download full SQLite + Config backup archive or restore from an existing backup file.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-gray-400">Auto-Backup Interval (Hours):</label>
+              <input id="set-backup-hours" type="number" value="24" min="1" class="w-16 px-2 py-1 rounded bg-[#141414] border border-[#303030] text-center" />
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-4">
+            <a href="/api/backup/download" class="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">⬇ Download Backup (.zip)</a>
+            <div class="flex items-center gap-2">
+              <input id="restore-file-input" type="file" accept=".zip" class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white" />
+              <button type="button" onclick="restoreBackup()" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold">⬆ Restore Backup</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: ADD INBOUND -->
+  <div id="modal-inbound" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-50">
+    <div class="x-card w-full max-w-md p-6 space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+        <h3 class="font-bold text-sm">Create New Inbound</h3>
+        <button onclick="closeModal('modal-inbound')">✕</button>
+      </div>
+      <form onsubmit="createInbound(event)" class="space-y-3">
+        <input id="inb-remark" type="text" required placeholder="Remark (e.g. AWG-Gaming-DE)" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+        <select id="inb-proto" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]">
+          <option value="WireGuard">WireGuard</option>
+          <option value="AmneziaWG">AmneziaWG</option>
+          <option value="OpenVPN">OpenVPN</option>
+          <option value="Private DNS">Private DNS</option>
+        </select>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="inb-port" type="number" value="51820" required class="px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          <input id="inb-endpoint" type="text" required class="px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+        </div>
+        <button type="submit" class="w-full py-2 rounded bg-[#1677ff] text-white font-semibold">Create Inbound</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD CLIENT -->
+  <div id="modal-client" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-50">
+    <div class="x-card w-full max-w-md p-6 space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+        <h3 class="font-bold text-sm">Create Client Account</h3>
+        <button onclick="closeModal('modal-client')">✕</button>
+      </div>
+      <form onsubmit="createClient(event)" class="space-y-3">
+        <input type="hidden" id="client-inb-id" />
+        <div>
+          <label class="block mb-1 text-gray-400">Client Name</label>
+          <input id="client-name" type="text" required placeholder="user_01" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block mb-1 text-gray-400">Quota (GB)</label>
+            <input id="client-limit" type="number" step="0.5" value="50" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">Duration (Days)</label>
+            <input id="client-days" type="number" value="30" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">IP Limit</label>
+            <input id="client-iplimit" type="number" value="1" min="1" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+        </div>
+        <div>
+          <label class="block mb-1 text-gray-400">Initial Authorized IP (for Private DNS, optional)</label>
+          <input id="client-init-ip" type="text" placeholder="5.120.44.10" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+        </div>
+        <button type="submit" class="w-full py-2 rounded bg-[#1677ff] text-white font-semibold">Create Client & Sub Link</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BULK CREATE CLIENTS -->
+  <div id="modal-bulk" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-50">
+    <div class="x-card w-full max-w-md p-6 space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+        <h3 class="font-bold text-sm">Bulk Generate Clients</h3>
+        <button onclick="closeModal('modal-bulk')">✕</button>
+      </div>
+      <form onsubmit="submitBulkClients(event)" class="space-y-3">
+        <input type="hidden" id="bulk-inb-id" />
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block mb-1 text-gray-400">Username Prefix</label>
+            <input id="bulk-prefix" type="text" value="sopr_vip" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">Count (1-100)</label>
+            <input id="bulk-count" type="number" value="5" min="1" max="100" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block mb-1 text-gray-400">Quota (GB)</label>
+            <input id="bulk-limit" type="number" value="50" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">Days</label>
+            <input id="bulk-days" type="number" value="30" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">IP Limit</label>
+            <input id="bulk-iplimit" type="number" value="1" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+        </div>
+        <button type="submit" class="w-full py-2 rounded bg-purple-600 text-white font-semibold">Generate Accounts</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT CLIENT -->
+  <div id="modal-edit-client" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-50">
+    <div class="x-card w-full max-w-md p-6 space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+        <h3 class="font-bold text-sm">Edit Client Quota & Expiry</h3>
+        <button onclick="closeModal('modal-edit-client')">✕</button>
+      </div>
+      <form onsubmit="submitEditClient(event)" class="space-y-3">
+        <input type="hidden" id="edit-cl-id" />
+        <div>
+          <label class="block mb-1 text-gray-400">Client Name</label>
+          <input id="edit-cl-name" type="text" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+        </div>
+        <div class="grid grid-cols-4 gap-2">
+          <div>
+            <label class="block mb-1 text-gray-400">Used (GB)</label>
+            <input id="edit-cl-used" type="number" step="0.1" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">Total (GB)</label>
+            <input id="edit-cl-total" type="number" step="0.5" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">Days Left</label>
+            <input id="edit-cl-days" type="number" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+          <div>
+            <label class="block mb-1 text-gray-400">IP Limit</label>
+            <input id="edit-cl-iplimit" type="number" required class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+          </div>
+        </div>
+        <div>
+          <label class="block mb-1 text-gray-400">Registered IP (Private DNS)</label>
+          <input id="edit-cl-ip" type="text" class="w-full px-3 py-2 rounded bg-[#141414] border border-[#303030]" />
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input id="edit-cl-enabled" type="checkbox" class="accent-emerald-500" />
+          <span>Account Enabled</span>
+        </label>
+        <button type="submit" class="w-full py-2 rounded bg-emerald-600 text-white font-semibold">Save Changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SUBSCRIPTION LINK & QR -->
+  <div id="modal-sub" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
+    <div class="x-card w-full max-w-lg p-6 space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+        <h3 id="sub-title" class="font-bold text-sm">Client Subscription</h3>
+        <button onclick="closeModal('modal-sub')">✕</button>
+      </div>
+      <div class="p-2.5 rounded bg-[#141414] border border-[#303030] flex items-center justify-between gap-2">
+        <code id="sub-url-text" class="text-blue-400 truncate"></code>
+        <div class="flex gap-1.5 shrink-0">
+          <button onclick="navigator.clipboard.writeText(document.getElementById('sub-url-text').textContent)" class="px-2.5 py-1 rounded bg-blue-600 text-white">Copy</button>
+          <a id="sub-open-link" target="_blank" class="px-2.5 py-1 rounded bg-emerald-600 text-white">Open Portal</a>
+        </div>
+      </div>
+      <div class="flex justify-center p-3 bg-white rounded-xl w-fit mx-auto"><div id="qrcode-box"></div></div>
+    </div>
+  </div>
+
+  <script>
+    let appData = { inbounds: [], blockCategories: [], blockedDomains: [], customRecords: [], logs: [], config: {} };
+    let expanded = new Set([1, 4]);
+    let chart = null;
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('login-user').value.trim();
+      const password = document.getElementById('login-pass').value.trim();
+      const res = await fetch('/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        await refreshState();
+        initTelemetry();
+      } else {
+        document.getElementById('login-err').classList.remove('hidden');
+      }
+    }
+
+    function switchTab(t) {
+      ['dashboard', 'inbounds', 'dns-control', 'settings'].forEach(x => {
+        document.getElementById('tab-' + x).classList.add('hidden');
+        document.getElementById('nav-' + x).classList.remove('bg-blue-600/15', 'text-blue-500');
+      });
+      document.getElementById('tab-' + t).classList.remove('hidden');
+      document.getElementById('nav-' + t).classList.add('bg-blue-600/15', 'text-blue-500');
+    }
+
+    async function refreshState() {
+      const res = await fetch('/api/state');
+      appData = await res.json();
+      const cfg = appData.config || {};
+      document.getElementById('sidebar-domain').textContent = cfg.domain || cfg.server_ip || '-';
+      document.getElementById('inb-endpoint').value = cfg.domain || cfg.server_ip || '';
+      document.getElementById('set-domain').value = cfg.domain || '';
+      document.getElementById('set-sub-base').value = cfg.sub_base_url || window.location.origin;
+      document.getElementById('set-web-path').value = cfg.web_base_path || '';
+      document.getElementById('set-admin-user').value = cfg.admin_user || 'admin';
+      document.getElementById('set-admin-pass').value = cfg.admin_pass || 'admin';
+      document.getElementById('set-dns-upstream').value = cfg.dns_upstream || '1.1.1.1';
+      document.getElementById('set-tg-token').value = cfg.tg_bot_token || '';
+      document.getElementById('set-tg-admin').value = cfg.tg_admin_id || '';
+      document.getElementById('set-tg-enabled').checked = !!cfg.tg_enabled;
+      document.getElementById('set-backup-hours').value = cfg.auto_backup_hours || 24;
+
+      const totalCl = appData.inbounds.reduce((a, b) => a + b.clients.length, 0);
+      document.getElementById('active-clients-count').textContent = totalCl;
+      renderInbounds();
+      renderDnsControl();
+      renderLogs();
+    }
+
+    function renderLogs() {
+      const box = document.getElementById('audit-logs-box');
+      box.innerHTML = (appData.logs || []).map(l => `
+        <div class="p-2 rounded bg-[#141414] border border-[#2a2a2a] flex justify-between gap-2">
+          <div><span class="text-blue-400 font-bold">[${l.category}]</span> ${l.message}</div>
+          <span class="text-[10px] text-gray-500 font-mono shrink-0">${l.created_at.split(' ')[1]}</span>
+        </div>
+      `).join('');
+    }
+
+    function getProtoBadge(proto) {
+      const m = {
+        'WireGuard': 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+        'AmneziaWG': 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+        'OpenVPN': 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+        'Private DNS': 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+      };
+      return `<span class="proto-badge ${m[proto] || ''}">${proto}</span>`;
+    }
+
+    function renderInbounds() {
+      const filter = document.getElementById('filter-proto').value;
+      const tbody = document.getElementById('inbounds-tbody');
+      const baseUrl = (appData.config.sub_base_url || window.location.origin).replace(/\/$/, '');
+      tbody.innerHTML = '';
+
+      appData.inbounds.filter(i => filter === 'ALL' || i.protocol === filter).forEach(inb => {
+        const isExp = expanded.has(inb.id);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50 dark:hover:bg-[#262626]';
+        tr.innerHTML = `
+          <td class="p-3 text-center"><button onclick="toggleExp(${inb.id})" class="w-6 h-6 rounded bg-[#303030] font-bold">${isExp ? '−' : '+'}</button></td>
+          <td class="p-3"><button onclick="toggleInb(${inb.id})" class="px-2 py-0.5 rounded-full text-[11px] ${inb.enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${inb.enabled ? 'Active' : 'Stopped'}</button></td>
+          <td class="p-3 font-bold">${inb.remark}</td>
+          <td class="p-3">${getProtoBadge(inb.protocol)}</td>
+          <td class="p-3 font-mono text-gray-400">${inb.endpoint}:${inb.port}</td>
+          <td class="p-3 font-mono text-blue-400">${inb.clients.length}</td>
+          <td class="p-3 text-center space-x-1">
+            <button onclick="openClientModal(${inb.id})" class="px-2.5 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white">+ Client</button>
+            <button onclick="openBulkModal(${inb.id})" class="px-2.5 py-1 rounded bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white">+ Bulk</button>
+            <button onclick="delInb(${inb.id})" class="px-2.5 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        if (isExp) {
+          const subTr = document.createElement('tr');
+          subTr.className = 'bg-[#181818]';
+          const rows = inb.clients.map(c => {
+            const pct = c.total_gb > 0 ? Math.min(100, Math.round((c.used_gb / c.total_gb) * 100)) : 0;
+            const st = inb.protocol === 'Private DNS'
+              ? (c.registered_ip ? `<span class="text-emerald-400 font-mono">IP: ${c.registered_ip}</span>` : `<span class="text-red-400">Blocked (No IP)</span>`)
+              : `<span class="font-mono text-gray-400">${c.allowed_ip || ''} (Max ${c.ip_limit || 1} IP)</span>`;
+            const subUrl = `${baseUrl}/sub/${inb.protocol.toLowerCase().replace(/\s+/g,'')}/${c.token}`;
+            return `<tr class="border-b border-[#2a2a2a]">
+              <td class="p-2.5">
+                <span class="inline-block w-2 h-2 rounded-full mr-1.5 ${c.enabled ? 'bg-emerald-400' : 'bg-red-500'}"></span>
+                <span class="font-semibold">${c.name}</span>
+              </td>
+              <td class="p-2.5">${st}</td>
+              <td class="p-2.5 w-44">
+                <div class="flex justify-between text-[11px] font-mono mb-1"><span>${c.used_gb}/${c.total_gb} GB</span><span>${pct}%</span></div>
+                <div class="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden"><div class="h-full ${pct >= 90 ? 'bg-red-500' : 'bg-blue-500'}" style="width:${pct}%"></div></div>
+              </td>
+              <td class="p-2.5 font-mono">${c.remaining_days}d left</td>
+              <td class="p-2.5 flex flex-wrap gap-1.5">
+                <button onclick="openSubModal('${c.name}', '${subUrl}')" class="px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white">🔗 Sub / QR</button>
+                <button onclick='openEditClient(${JSON.stringify(c)})' class="px-2 py-1 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-white">✏️ Edit</button>
+                <button onclick="resetClient(${c.id})" class="px-2 py-1 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500 hover:text-white">🔄 Renew</button>
+                <button onclick="delClient(${c.id})" class="px-2 py-1 rounded bg-red-500/15 text-red-400">Delete</button>
+              </td>
+            </tr>`;
+          }).join('');
+          subTr.innerHTML = `<td colspan="7" class="p-3"><table class="w-full text-left text-xs bg-[#1f1f1f] rounded-lg overflow-hidden"><tbody>${rows || '<tr><td class="p-3 text-gray-500">No clients in this inbound.</td></tr>'}</tbody></table></td>`;
+          tbody.appendChild(subTr);
+        }
+      });
+    }
+
+    function toggleExp(id) { expanded.has(id) ? expanded.delete(id) : expanded.add(id); renderInbounds(); }
+    async function toggleInb(id) { await fetch(`/api/inbounds/${id}/toggle`, { method: 'POST' }); refreshState(); }
+    async function delInb(id) { await fetch(`/api/inbounds/${id}`, { method: 'DELETE' }); refreshState(); }
+    async function delClient(id) { await fetch(`/api/clients/${id}`, { method: 'DELETE' }); refreshState(); }
+    async function resetClient(id) { await fetch(`/api/clients/${id}/reset`, { method: 'POST' }); refreshState(); }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('flex'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+
+    async function createInbound(e) {
+      e.preventDefault();
+      await fetch('/api/inbounds', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          remark: document.getElementById('inb-remark').value,
+          protocol: document.getElementById('inb-proto').value,
+          port: parseInt(document.getElementById('inb-port').value, 10),
+          endpoint: document.getElementById('inb-endpoint').value
+        })
+      });
+      closeModal('modal-inbound');
+      refreshState();
+    }
+
+    function openClientModal(inbId) {
+      document.getElementById('client-inb-id').value = inbId;
+      openModal('modal-client');
+    }
+
+    function openBulkModal(inbId) {
+      document.getElementById('bulk-inb-id').value = inbId;
+      openModal('modal-bulk');
+    }
+
+    async function createClient(e) {
+      e.preventDefault();
+      const inbId = document.getElementById('client-inb-id').value;
+      await fetch(`/api/inbounds/${inbId}/clients`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('client-name').value,
+          total_gb: parseFloat(document.getElementById('client-limit').value),
+          days: parseInt(document.getElementById('client-days').value, 10),
+          ip_limit: parseInt(document.getElementById('client-iplimit').value, 10) || 1,
+          registered_ip: document.getElementById('client-init-ip').value
+        })
+      });
+      closeModal('modal-client');
+      refreshState();
+    }
+
+    async function submitBulkClients(e) {
+      e.preventDefault();
+      const inbId = document.getElementById('bulk-inb-id').value;
+      await fetch(`/api/inbounds/${inbId}/clients/bulk`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prefix: document.getElementById('bulk-prefix').value,
+          count: parseInt(document.getElementById('bulk-count').value, 10),
+          total_gb: parseFloat(document.getElementById('bulk-limit').value),
+          days: parseInt(document.getElementById('bulk-days').value, 10),
+          ip_limit: parseInt(document.getElementById('bulk-iplimit').value, 10) || 1
+        })
+      });
+      closeModal('modal-bulk');
+      refreshState();
+    }
+
+    function openEditClient(c) {
+      document.getElementById('edit-cl-id').value = c.id;
+      document.getElementById('edit-cl-name').value = c.name;
+      document.getElementById('edit-cl-used').value = c.used_gb;
+      document.getElementById('edit-cl-total').value = c.total_gb;
+      document.getElementById('edit-cl-days').value = Math.ceil(c.remaining_days || c.days);
+      document.getElementById('edit-cl-iplimit').value = c.ip_limit || 1;
+      document.getElementById('edit-cl-ip').value = c.registered_ip || '';
+      document.getElementById('edit-cl-enabled').checked = !!c.enabled;
+      openModal('modal-edit-client');
+    }
+
+    async function submitEditClient(e) {
+      e.preventDefault();
+      const cid = document.getElementById('edit-cl-id').value;
+      await fetch(`/api/clients/${cid}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('edit-cl-name').value,
+          used_gb: parseFloat(document.getElementById('edit-cl-used').value),
+          total_gb: parseFloat(document.getElementById('edit-cl-total').value),
+          days: parseInt(document.getElementById('edit-cl-days').value, 10),
+          ip_limit: parseInt(document.getElementById('edit-cl-iplimit').value, 10) || 1,
+          registered_ip: document.getElementById('edit-cl-ip').value,
+          enabled: document.getElementById('edit-cl-enabled').checked
+        })
+      });
+      closeModal('modal-edit-client');
+      refreshState();
+    }
+
+    function openSubModal(name, url) {
+      document.getElementById('sub-title').textContent = `Subscription — ${name}`;
+      document.getElementById('sub-url-text').textContent = url;
+      document.getElementById('sub-open-link').href = url;
+      const box = document.getElementById('qrcode-box');
+      box.innerHTML = '';
+      new QRCode(box, { text: url, width: 130, height: 130 });
+      openModal('modal-sub');
+    }
+
+    function renderDnsControl() {
+      const list = document.getElementById('dns-ip-list');
+      list.innerHTML = '';
+      appData.inbounds.filter(i => i.protocol === 'Private DNS').forEach(inb => {
+        inb.clients.forEach(c => {
+          list.innerHTML += `<div class="p-3 rounded-lg bg-[#141414] border border-[#303030] flex items-center justify-between gap-2 text-xs">
+            <div><div class="font-bold">${c.name}</div><div class="${c.registered_ip ? 'text-emerald-400' : 'text-red-400'}">${c.registered_ip || 'No IP Registered (Blocked)'}</div></div>
+            <div class="flex gap-1.5">
+              <input id="ip-in-${c.id}" value="${c.registered_ip || ''}" placeholder="IPv4..." class="w-32 px-2 py-1 rounded bg-[#1f1f1f] border border-[#303030]" />
+              <button onclick="saveIp(${c.id})" class="px-2.5 py-1 rounded bg-blue-600 text-white">Save</button>
+            </div>
+          </div>`;
+        });
+      });
+
+      document.getElementById('block-categories').innerHTML = appData.blockCategories.map(c => `
+        <button onclick="toggleCat('${c.id}')" class="p-2 rounded border text-xs flex justify-between ${c.enabled ? 'bg-red-500/15 border-red-500/40 text-red-300' : 'bg-[#141414] border-[#303030] text-gray-400'}">
+          <span>${c.label}</span><span>${c.enabled ? '🔒' : '🔓'}</span>
+        </button>
+      `).join('');
+
+      document.getElementById('blocked-domains-tags').innerHTML = appData.blockedDomains.map(d => `
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 text-xs font-mono">
+          ${d} <button onclick="delDomain('${d}')">×</button>
+        </span>
+      `).join('');
+
+      document.getElementById('custom-records-list').innerHTML = (appData.customRecords || []).map(r => `
+        <div class="p-2.5 rounded bg-[#141414] border border-[#303030] flex justify-between items-center font-mono">
+          <span>${r.domain} → <b class="text-emerald-400">${r.target_ip}</b></span>
+          <button onclick="delCustomRecord(${r.id})" class="text-red-400 hover:text-white">×</button>
+        </div>
+      `).join('');
+    }
+
+    async function saveIp(cid) {
+      const ip = document.getElementById('ip-in-' + cid).value;
+      await fetch(`/api/clients/${cid}/ip`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
+      refreshState();
+    }
+    async function toggleCat(id) { await fetch(`/api/dns/categories/${id}/toggle`, { method: 'POST' }); refreshState(); }
+    async function addBlockedDomain(e) {
+      e.preventDefault();
+      const pattern = document.getElementById('new-block-domain').value;
+      await fetch('/api/dns/domains', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pattern }) });
+      document.getElementById('new-block-domain').value = '';
+      refreshState();
+    }
+    async function delDomain(pattern) { await fetch(`/api/dns/domains?pattern=${encodeURIComponent(pattern)}`, { method: 'DELETE' }); refreshState(); }
+
+    async function addCustomRecord(e) {
+      e.preventDefault();
+      await fetch('/api/dns/records', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: document.getElementById('rec-domain').value, target_ip: document.getElementById('rec-ip').value })
+      });
+      document.getElementById('rec-domain').value = '';
+      document.getElementById('rec-ip').value = '';
+      refreshState();
+    }
+    async function delCustomRecord(id) { await fetch(`/api/dns/records/${id}`, { method: 'DELETE' }); refreshState(); }
+
+    async function saveAllSettings(e) {
+      e.preventDefault();
+      const res = await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_user: document.getElementById('set-admin-user').value,
+          admin_pass: document.getElementById('set-admin-pass').value,
+          web_base_path: document.getElementById('set-web-path').value,
+          dns_upstream: document.getElementById('set-dns-upstream').value,
+          domain: document.getElementById('set-domain').value,
+          sub_base_url: document.getElementById('set-sub-base').value,
+          tg_bot_token: document.getElementById('set-tg-token').value,
+          tg_admin_id: document.getElementById('set-tg-admin').value,
+          tg_enabled: document.getElementById('set-tg-enabled').checked,
+          auto_backup_hours: parseInt(document.getElementById('set-backup-hours').value, 10) || 24
+        })
+      });
+      if (res.ok) {
+        alert('Settings saved! If you changed the Secret Web Path, bookmark the new URL.');
+        refreshState();
+      }
+    }
+
+    async function testTelegram() {
+      const res = await fetch('/api/telegram/test', { method: 'POST' });
+      alert(res.ok ? 'Test message sent to Telegram!' : 'Failed to send. Save your Bot Token & Admin ID first.');
+    }
+
+    async function sendBackupTelegram() {
+      const res = await fetch('/api/backup/telegram', { method: 'POST' });
+      alert(res.ok ? 'Backup archive sent to Telegram!' : 'Failed to send backup.');
+    }
+
+    async function applyDomainSsl() {
+      const res = await fetch('/api/domain/apply-ssl', { method: 'POST' });
+      const data = await res.json();
+      alert(res.ok ? data.message : (data.detail || 'SSL error'));
+    }
+
+    async function restoreBackup() {
+      const inp = document.getElementById('restore-file-input');
+      if (!inp.files.length) return alert('Select a .zip backup file first.');
+      const fd = new FormData();
+      fd.append('file', inp.files[0]);
+      const res = await fetch('/api/backup/restore', { method: 'POST', body: fd });
+      if (res.ok) {
+        alert('Database restored successfully!');
+        refreshState();
+      } else {
+        const d = await res.json();
+        alert(d.detail || 'Restore failed');
+      }
+    }
+
+    function initTelemetry() {
+      const ctx = document.getElementById('trafficChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: ['-10s','-8s','-6s','-4s','-2s','Now'], datasets: [
+          { label: 'CPU %', data: [0,0,0,0,0,0], borderColor: '#1677ff', fill: true, backgroundColor: 'rgba(22,119,255,0.1)' },
+          { label: 'RAM %', data: [0,0,0,0,0,0], borderColor: '#52c41a', fill: true, backgroundColor: 'rgba(82,196,26,0.1)' }
+        ]},
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
+      });
+
+      const poll = async () => {
+        const s = await (await fetch('/api/stats')).json();
+        document.getElementById('cpu-val').textContent = s.cpu_percent + '%';
+        document.getElementById('cpu-bar').style.width = s.cpu_percent + '%';
+        document.getElementById('cpu-sub').textContent = `${s.cpu_cores} Cores • Ubuntu 22.04+`;
+        document.getElementById('ram-val').textContent = `${s.ram_used_gb} / ${s.ram_total_gb} GB`;
+        document.getElementById('ram-bar').style.width = s.ram_percent + '%';
+        document.getElementById('disk-val').textContent = `${s.disk_used_gb} / ${s.disk_total_gb} GB`;
+        document.getElementById('disk-bar').style.width = s.disk_percent + '%';
+        document.getElementById('dns-port-sub').textContent = `DNS Port: ${s.dns_port} (UDP/TCP)`;
+        document.getElementById('net-io-sub').textContent = `↑ ${s.net_sent_gb} GB | ↓ ${s.net_recv_gb} GB`;
+        if (s.dns_stats) {
+          document.getElementById('dns-queries-sub').textContent = `DNS Queries: ${s.dns_stats.total_queries} (Blocked: ${s.dns_stats.blocked_queries})`;
+        }
+
+        chart.data.datasets[0].data.shift(); chart.data.datasets[0].data.push(s.cpu_percent);
+        chart.data.datasets[1].data.shift(); chart.data.datasets[1].data.push(s.ram_percent);
+        chart.update('none');
+      };
+      poll();
+      setInterval(poll, 3000);
+    }
+  </script>
+</body>
+</html>
